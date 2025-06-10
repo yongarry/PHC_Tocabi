@@ -44,13 +44,15 @@ def key_call_back( keycode):
     elif chr(keycode) == " ":
         print("Paused")
         paused = not paused
-    elif chr(keycode) == "T":
+    elif chr(keycode) == "N":
         print("next")
         motion_id += 1
         curr_motion_key = motion_data_keys[motion_id]
         print(curr_motion_key)
     else:
         print("not mapped", chr(keycode))
+        print(curr_motion_key)
+
     
     
         
@@ -67,6 +69,7 @@ def main(cfg : DictConfig) -> None:
     print(motion_file)
     motion_data = joblib.load(motion_file)
     motion_data_keys = list(motion_data.keys())
+    print("total motion datas:", len(motion_data_keys))
     
     
     mj_model = mujoco.MjModel.from_xml_path(humanoid_xml)

@@ -5,6 +5,7 @@ import pdb
 import os.path as osp
 sys.path.append(os.getcwd())
 
+import torch.multiprocessing as mp
 from smpl_sim.utils import torch_utils
 from smpl_sim.poselib.skeleton.skeleton3d import SkeletonTree, SkeletonMotion, SkeletonState
 from scipy.spatial.transform import Rotation as sRot
@@ -33,9 +34,9 @@ from omegaconf import DictConfig, OmegaConf
 def load_amass_data(data_path):
     entry_data = dict(np.load(open(data_path, "rb"), allow_pickle=True))
 
-    if not 'mocap_framerate' in  entry_data:
+    if not 'mocap_frame_rate' in  entry_data:
         return 
-    framerate = entry_data['mocap_framerate']
+    framerate = entry_data['mocap_frame_rate']
 
 
     root_trans = entry_data['trans']
@@ -78,6 +79,8 @@ def process_motion(key_names, key_name_to_pkls, cfg):
         
         if cfg.robot.humanoid_type == "g1": # G1 is 1.32m tall, but SMPL mean is 1.75m
             trans = trans * 1.32/1.75
+        if cfg.robot.humanoid_type == "tocabi":
+            trans = trans * 1.80/1.75
             
         N = trans.shape[0]
         pose_aa_walk = torch.from_numpy(amass_data['pose_aa'][::skip]).float()
@@ -143,26 +146,26 @@ def process_motion(key_names, key_name_to_pkls, cfg):
             pbar.set_description_str(f"{data_key}-Iter: {iteration} \t {loss.item() * 1000:.3f}")
             dof_pos_new.data = gaussian_filter_1d_batch(dof_pos_new.squeeze().transpose(1, 0)[None, ], kernel_size, sigma).transpose(2, 1)[..., None]
             
-        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
-        import matplotlib.pyplot as plt
+        # from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
+        # import matplotlib.pyplot as plt
         
-        j3d = fk_return.global_translation_extend[0, :, :, :].detach().numpy()
-        j3d_joints = joints.detach().numpy()
-        idx = 0
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.view_init(90, 0)
-        ax.scatter(j3d[idx, :,0], j3d[idx, :,1], j3d[idx, :,2])
-        ax.scatter(j3d_joints[idx, :,0], j3d_joints[idx, :,1], j3d_joints[idx, :,2])
+        # j3d = fk_return.global_translation_extend[0, :, :, :].detach().numpy()
+        # j3d_joints = joints.detach().numpy()
+        # idx = 0
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='3d')
+        # ax.view_init(90, 0)
+        # ax.scatter(j3d[idx, :,0], j3d[idx, :,1], j3d[idx, :,2])
+        # ax.scatter(j3d_joints[idx, :,0], j3d_joints[idx, :,1], j3d_joints[idx, :,2])
 
-        ax.set_xlabel('X Label')
-        ax.set_ylabel('Y Label')
-        ax.set_zlabel('Z Label')
-        drange = 1
-        ax.set_xlim(-drange, drange)
-        ax.set_ylim(-drange, drange)
-        ax.set_zlim(-drange, drange)
-        plt.show()
+        # ax.set_xlabel('X Label')
+        # ax.set_ylabel('Y Label')
+        # ax.set_zlabel('Z Label')
+        # drange = 1
+        # ax.set_xlim(-drange, drange)
+        # ax.set_ylim(-drange, drange)
+        # ax.set_zlim(-drange, drange)
+        # plt.show()
         
             
         dof_pos_new.data.clamp_(humanoid_fk.joints_range[:, 0, None], humanoid_fk.joints_range[:, 1, None])
@@ -201,14 +204,21 @@ def main(cfg : DictConfig) -> None:
     else:
         raise ValueError("amass_root is not specified in the config")
     
-    all_pkls = glob.glob(f"{amass_root}/**/*.npz", recursive=True)
-    split_len = len(amass_root.split("/"))
-    key_name_to_pkls = {"0-" + "_".join(data_path.split("/")[split_len:]).replace(".npz", ""): data_path for data_path in all_pkls}
-    key_names = ["0-" + "_".join(data_path.split("/")[split_len:]).replace(".npz", "") for data_path in all_pkls]
-    if not cfg.get("fit_all", False):
-        key_names = ["0-KIT_3_walking_slow08_poses"]
+    if cfg.get("fit_all", False):
+        all_pkls = glob.glob(f"{amass_root}/**/*.npz", recursive=True)
+        split_len = len(amass_root.split("/"))
+        key_name_to_pkls = {"0-" + "_".join(data_path.split("/")[split_len:]).replace(".npz", ""): data_path for data_path in all_pkls}
+        key_names = ["0-" + "_".join(data_path.split("/")[split_len:]).replace(".npz", "") for data_path in all_pkls]
+    # if not cfg.get("fit_all", False):
+        # key_names = ["0-Transitions_mocap_mazen_c3d_dance_stand_poses"]
+    else:
+        pkl = glob.glob(f"{amass_root}", recursive=True)
+        key_name_to_pkls = {"0-" + "_".join(data_path.split("/")[1:]).replace(".npz", ""): data_path for data_path in pkl}
+        key_names = ["0-" + "_".join(data_path.split("/")[1:]).replace(".npz", "") for data_path in pkl]
     
-    from multiprocessing import Pool
+    # from multiprocessing import Pool
+    torch.set_num_threads(1)
+    mp.set_sharing_strategy('file_descriptor')
     jobs = key_names
     num_jobs = 30
     chunk = np.ceil(len(jobs)/num_jobs).astype(int)
@@ -218,7 +228,7 @@ def main(cfg : DictConfig) -> None:
         all_data = process_motion(key_names, key_name_to_pkls, cfg)
     else:
         try:
-            pool = Pool(num_jobs)   # multi-processing
+            pool = mp.Pool(num_jobs)   # multi-processing
             all_data_list = pool.starmap(process_motion, job_args)
         except KeyboardInterrupt:
             pool.terminate()
@@ -235,7 +245,7 @@ def main(cfg : DictConfig) -> None:
         joblib.dump(all_data, dumped_file)
     else:
         os.makedirs(f"data/{cfg.robot.humanoid_type}/v1/", exist_ok=True)
-        joblib.dump(all_data, f"data/{cfg.robot.humanoid_type}/v1/amass_all.pkl")
+        joblib.dump(all_data, f"data/{cfg.robot.humanoid_type}/v1/{cfg.amass_root.split('/')[-1]}.pkl")
     
 
 

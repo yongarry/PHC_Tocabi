@@ -299,6 +299,7 @@ def main(cfg_hydra: DictConfig) -> None:
     if (not cfg.no_log) and (not cfg.test) and (not cfg.debug):
         wandb.init(
             project=project_name,
+            entity="yongarry",
             resume=not cfg.resume_str is None,
             id=cfg.resume_str,
             notes=cfg.get("notes", "no notes"),
