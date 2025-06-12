@@ -99,7 +99,7 @@ class HumanoidIm(humanoid_amp_task.HumanoidAMPTask):
 
         super().__init__(cfg=cfg, sim_params=sim_params, physics_engine=physics_engine, device_type=device_type, device_id=device_id, headless=headless)
         
-        if self.humanoid_type in ['h1', 'g1', ]:
+        if self.humanoid_type in ['h1', 'g1', 'tocabi']:
             self.actions = torch.zeros(self.num_envs, self._dof_obs_size).to(self.device) #### Keeping taps on previous actions
             
         # Overriding
@@ -339,7 +339,7 @@ class HumanoidIm(humanoid_amp_task.HumanoidAMPTask):
             self._motion_lib.load_motions(skeleton_trees=self.skeleton_trees, gender_betas=self.humanoid_shapes.cpu(),
                                           limb_weights=self.humanoid_limb_and_weights.cpu(), random_sample=(not flags.test) and (not self.seq_motions),
                                           max_len=-1 if flags.test else self.max_len, start_idx=self.start_idx)
-        elif self.humanoid_type in ['h1', 'g1']:
+        elif self.humanoid_type in ['h1', 'g1', 'tocabi']:
             motion_lib_cfg = EasyDict({
                 "motion_file": motion_train_file,
                 "device": torch.device("cpu"),
@@ -439,7 +439,7 @@ class HumanoidIm(humanoid_amp_task.HumanoidAMPTask):
             dof_pos_seg = data_to_dump['dof_pos'][start:end, humanoid_index]
             B, H = dof_pos_seg.shape
             root_states_seg = data_to_dump['root_states'][start:end, humanoid_index]
-            if self.humanoid_type in ['h1', 'g1' ]:
+            if self.humanoid_type in ['h1', 'g1', 'tocabi']:
                 motion_dump = {
                     "skeleton_tree": self.state_record['skeleton_trees'][humanoid_index].to_dict(),
                     "trans": root_states_seg[:, :3],
@@ -669,6 +669,9 @@ class HumanoidIm(humanoid_amp_task.HumanoidAMPTask):
         return
 
     def post_physics_step(self):
+        '''
+        compute observations, rewards, resets, ...
+        '''
         super().post_physics_step()
         
         if flags.im_eval:
@@ -912,7 +915,7 @@ class HumanoidIm(humanoid_amp_task.HumanoidAMPTask):
 
         else:
             if self._full_body_reward:
-                if self.humanoid_type in ['h1', 'g1']:
+                if self.humanoid_type in ['h1', 'g1', 'tocabi']:
                     extend_curr_pos = torch_utils.my_quat_rotate(body_rot[:, self.extend_body_parent_ids].reshape(-1, 4), self.extend_body_pos_in_parent.reshape(-1, 3)).view(self.num_envs, -1, 3) + body_pos[:, self.extend_body_parent_ids]
                     body_pos_extend = torch.cat([body_pos, extend_curr_pos], dim=1)
                     body_rot_extend = torch.cat([body_rot, body_rot[:, self.extend_body_parent_ids]], dim=1)
@@ -1009,7 +1012,7 @@ class HumanoidIm(humanoid_amp_task.HumanoidAMPTask):
         if flags.test:
             motion_times[:] = 0
         
-        if self.humanoid_type in ['h1', 'g1',"smpl", "smplh", "smplx"] :
+        if self.humanoid_type in ['h1', 'g1','tocabi', "smpl", "smplh", "smplx"] :
             motion_res = self._get_state_from_motionlib_cache(self._sampled_motion_ids[env_ids], motion_times, self._global_offset[env_ids])
             root_pos, root_rot, dof_pos, root_vel, root_ang_vel, dof_vel, smpl_params, limb_weights, pose_aa, ref_rb_pos, ref_rb_rot, ref_body_vel, ref_body_ang_vel = \
                 motion_res["root_pos"], motion_res["root_rot"], motion_res["dof_pos"], motion_res["root_vel"], motion_res["root_ang_vel"], motion_res["dof_vel"], \
@@ -1104,7 +1107,9 @@ class HumanoidIm(humanoid_amp_task.HumanoidAMPTask):
     
 
     def pre_physics_step(self, actions):
-
+        '''
+        apply actions
+        '''
         super().pre_physics_step(actions)
         self._update_cycle_count()
 

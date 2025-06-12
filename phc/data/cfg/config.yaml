@@ -1,16 +1,22 @@
 defaults:
   - _self_
-  - env: env_im
-  - robot: smpl_humanoid
-  - learning: im
-  - sim: default_sim
-  - control: default_control
+  # - env: env_im
+  # - robot: smpl_humanoid
+  # - learning: im
+  # - sim: default_sim
+  # - control: default_control
+  # - domain_rand: default_dr
+  - env: env_im_tocabi_phc
+  - robot: tocabi
+  - learning: im_pnn_big
+  - sim: tocabi_sim
+  - control: tocabi_control
   - domain_rand: default_dr
 
-project_name: "PHC"
+project_name: "TocabiPHC"
 notes: "Default Notes"
-exp_name: &exp_name humanoid_smpl
-headless: True
+exp_name: &exp_name tocabi_phc
+headless: False
 seed: 0
 no_log: False
 resume_str: null

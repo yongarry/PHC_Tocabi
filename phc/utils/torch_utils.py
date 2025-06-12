@@ -258,3 +258,49 @@ def activation_facotry(act_name):
         nn.Softplus
     elif act_name == "None":
         return nn.Identity
+    
+@torch.jit.script
+def quat2mat(q):
+    mat = torch.zeros(q.shape[0],4,4,device=q.device)
+    w = q[:,3]
+    x = q[:,0]
+    y = q[:,1]
+    z = q[:,2]
+    mat[:,0,0] = w*w + x*x - y*y -z*z
+    mat[:,0,1] = 2*x*y - 2*w*z
+    mat[:,0,2] = 2*x*z + 2*w*y
+    mat[:,1,0] = 2*x*y + 2*w*z
+    mat[:,1,1] = w*w - x*x + y*y - z*z
+    mat[:,1,2] = 2*y*z - 2*w*x
+    mat[:,2,0] = 2*x*z - 2*w*y
+    mat[:,2,1] = 2*y*z + 2*w*x
+    mat[:,2,2] = w*w - x*x - y*y + z*z
+    mat[:,3,3] = 1
+    return mat
+
+@torch.jit.script
+def mat2euler(mat):
+    FLOAT_EPS = float(2.220446049250313e-16)
+    EPS4 = FLOAT_EPS*4
+    cy = torch.sqrt(mat[:,0,0]*mat[:,0,0]+mat[:,1,0]*mat[:,1,0])
+    condition = cy > EPS4
+    z = torch.where(
+        condition, 
+        torch.atan2(mat[:,1,0],mat[:,0,0]),
+        torch.atan2(-mat[:,0,1],mat[:,1,1])
+    )
+    y = torch.where(
+        condition, 
+        torch.atan2(-mat[:,2,0],cy),
+        torch.atan2(-mat[:,2,0],cy)
+    )
+    x = torch.where(
+        condition, 
+        torch.atan2(mat[:,2,1],mat[:,2,2]),
+        torch.zeros_like(y,dtype=torch.float)
+    )
+    return x, y, z
+
+@torch.jit.script
+def quat2euler(q):
+    return mat2euler(quat2mat(q))

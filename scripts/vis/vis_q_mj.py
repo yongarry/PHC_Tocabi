@@ -51,7 +51,7 @@ def key_call_back( keycode):
         print(curr_motion_key)
     else:
         print("not mapped", chr(keycode))
-        print(curr_motion_key)
+        print(motion_data_keys[motion_id])
 
     
     

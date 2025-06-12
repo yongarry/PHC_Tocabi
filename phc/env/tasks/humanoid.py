@@ -54,7 +54,7 @@ import torch.multiprocessing as mp
 from phc.utils.draw_utils import agt_color, get_color_gradient
 
 
-ENABLE_MAX_COORD_OBS = True
+ENABLE_MAX_COORD_OBS = False #for tocabi
 # PERTURB_OBJS = [
 #     ["small", 60],
 #     ["small", 7],
@@ -124,7 +124,7 @@ class Humanoid(BaseTask):
         self.self_obs_buf = torch.zeros((self.num_envs, self.get_self_obs_size()), device=self.device, dtype=torch.float)
         self.reward_raw = torch.zeros((self.num_envs, 1)).to(self.device)
         
-        if self.humanoid_type in ['h1', 'g1', ]:
+        if self.humanoid_type in ['h1', 'g1', 'tocabi']:
             self.gravity_vec = to_torch(get_axis_params(-1., self.up_axis_idx), device=self.device).repeat((self.num_envs, 1))
             self.base_link_id = self._build_key_body_ids_tensor([self.cfg.robot.base_link]).squeeze()
 
@@ -251,7 +251,7 @@ class Humanoid(BaseTask):
         self.humanoid_type = cfg.robot.humanoid_type
         if self.humanoid_type in ["smpl", "smplh", "smplx"]:
             self.load_smpl_configs(cfg)
-        elif self.humanoid_type in ['h1', 'g1']:
+        elif self.humanoid_type in ['h1', 'g1', 'tocabi']:
             self.load_robot_configs(cfg)
         else:
             raise NotImplementedError
@@ -698,7 +698,16 @@ class Humanoid(BaseTask):
             
             if not self._root_height_obs:
                 self._num_self_obs -= 1
-                
+
+        elif self.humanoid_type in ["tocabi"]:
+            self._dof_obs_size = len(self._dof_names)
+            self._dof_offsets = np.arange(len(self._dof_names) + 1)
+            self._num_actions = len(self._dof_names)
+            if (ENABLE_MAX_COORD_OBS):
+                self._num_self_obs = 1 + len(self._body_names) * (3 + 6 + 3 + 3) - 3
+            else:
+                self._num_self_obs = (1 + 3 + 3 + 3) + self._dof_obs_size * 2 + 3 * num_key_bodies # [root_h, root_euler, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos]
+
         else:
             print("Unsupported character config file: {s}".format(asset_file))
             assert (False)
@@ -913,7 +922,40 @@ class Humanoid(BaseTask):
             self.humanoid_shapes = torch.tensor(np.zeros((num_envs, 10))).float().to(self.device)
             self.humanoid_assets = [humanoid_asset] * num_envs
             self.skeleton_trees = [sk_tree] * num_envs
+        elif self.humanoid_type in ['tocabi']:
+            self.humanoid_limb_and_weights = []
+            xml_asset_path = os.path.join(asset_root, asset_file)
             
+            robot_file = os.path.join(asset_root, self.cfg.robot.asset.urdfFileName)
+            asset_root = os.path.dirname(robot_file) # use urdf file. 
+            asset_file = os.path.basename(robot_file)
+            sk_tree = SkeletonTree.from_mjcf(xml_asset_path)
+
+            asset_options = gymapi.AssetOptions()
+            asset_options.angular_damping = 0.0
+            asset_options.max_angular_velocity = 100.0
+            asset_options.default_dof_drive_mode = gymapi.DOF_MODE_NONE
+            #asset_options.fix_base_link = True
+            asset_options.replace_cylinder_with_capsule = True
+            
+            humanoid_asset = self.gym.load_asset(self.sim, asset_root, asset_file, asset_options)
+
+            actuator_props = self.gym.get_asset_actuator_properties(humanoid_asset)
+            
+            motor_efforts = [prop.motor_effort for prop in actuator_props]
+            print("motor_efforts", motor_efforts)
+
+            # create force sensors at the feet
+            right_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, self.cfg.robot.right_foot_name)
+            left_foot_idx = self.gym.find_asset_rigid_body_index(humanoid_asset, self.cfg.robot.left_foot_name)
+            sensor_pose = gymapi.Transform()
+
+            self.gym.create_asset_force_sensor(humanoid_asset, right_foot_idx, sensor_pose)
+            self.gym.create_asset_force_sensor(humanoid_asset, left_foot_idx, sensor_pose)
+            self.humanoid_shapes = torch.tensor(np.zeros((num_envs, 10))).float().to(self.device)
+            self.humanoid_assets = [humanoid_asset] * num_envs
+            self.skeleton_trees = [sk_tree] * num_envs
+
         else:
 
             asset_path = os.path.join(asset_root, asset_file)
@@ -982,7 +1024,7 @@ class Humanoid(BaseTask):
         self.dof_limits = torch.stack([self.dof_limits_lower, self.dof_limits_upper], dim=-1)
         self.torque_limits = to_torch(dof_prop['effort'], device = self.device)
         
-        if self.humanoid_type in ['h1', 'g1']:
+        if self.humanoid_type in ['h1', 'g1', 'tocabi']:
             self._process_dof_props(dof_prop)
 
         if self.control_mode in ["pd", "isaac_pd"]:
@@ -1123,13 +1165,13 @@ class Humanoid(BaseTask):
         elif self.humanoid_type in ["g1"]:
             if self.cfg.env.get("pd_v", 1) == 1:
                 self.p_gains = to_torch([100., 100., 100., 200.,  20.,  20., 100., 100., 100., 200.,  20.,  20.,
-        400., 400., 400.,  90.,  60.,  20.,  60.,  90.,  60.,  20.,  60.], device=self.device)
+                                         400., 400., 400.,  90.,  60.,  20.,  60.,  90.,  60.,  20.,  60.], device=self.device)
                 
                 self.d_gains = to_torch([2.5000, 2.5000, 2.5000, 5.0000, 0.2000, 0.1000, 2.5000, 2.5000, 2.5000,
-        5.0000, 0.2000, 0.1000, 5.0000, 5.0000, 5.0000, 2.0000, 1.0000, 0.4000,
-        1.0000, 2.0000, 1.0000, 0.4000, 1.0000], device=self.device)
+                                         5.0000, 0.2000, 0.1000, 5.0000, 5.0000, 5.0000, 2.0000, 1.0000, 0.4000,
+                                         1.0000, 2.0000, 1.0000, 0.4000, 1.0000], device=self.device)
                 self.torque_limits_hard_coded = to_torch([ 88.,  88.,  88., 139.,  50.,  50.,  88.,  88.,  88., 139.,  50.,  50.,
-         88.,  50.,  50.,  25.,  25.,  25.,  25.,  25.,  25.,  25.,  25.], device=self.device)
+                                                           88.,  50.,  50.,  25.,  25.,  25.,  25.,  25.,  25.,  25.,  25.], device=self.device)
             
             self.p_gains, self.d_gains = to_torch(self.p_gains), to_torch(self.d_gains)
             self.default_dof_pos = torch.tensor([[
@@ -1157,7 +1199,19 @@ class Humanoid(BaseTask):
                                     0.0,   # right_shoulder_yaw_joint
                                     0.0    # right_elbow_joint
                                 ]]).to(self.device)
-        
+        elif self.humanoid_type in ["tocabi"]:
+            self.torque_limits_hard_coded = to_torch([333,232,263,289,222,166,
+                                                      333,232,263,289,222,166,
+                                                      303,303,303,
+                                                      64,64,64,64,23,23,10,10,
+                                                      10,10,
+                                                      64,64,64,64,23,23,10,10], device=self.device)
+            self.default_dof_pos = torch.tensor([0.0, 0.0, -0.24, 0.6, -0.36, 0.0,
+                                                 0.0, 0.0, -0.24, 0.6, -0.36, 0.0,
+                                                 0.0, 0.0, 0.0, 
+                                                 0.3, 0.3, 1.5, -1.27, -1.0, 0.0, -1.0, 0.0,
+                                                 0.0, 0.0, 
+                                                 -0.3, -0.3, -1.5, 1.27, 1.0, 0.0, 1.0, 0.0], device=self.device)
         
         dof_prop = self.gym.get_asset_dof_properties(humanoid_asset)
         if self.control_mode in ["isaac_pd"]:
@@ -1174,11 +1228,21 @@ class Humanoid(BaseTask):
 
         elif self.control_mode in ["pd", "force"]:
             dof_prop["driveMode"] = gymapi.DOF_MODE_EFFORT
+            if self.humanoid_type in ['tocabi']:
+                dof_prop['stiffness'].fill(0.0)
+                dof_prop['damping'].fill(1.5)
+                dof_prop['effort'].fill(4.03)
+                dof_prop['armature'] = [0.614, 0.862, 1.09, 1.09, 1.09, 0.360,\
+                                        0.614, 0.862, 1.09, 1.09, 1.09, 0.360,\
+                                        0.078, 0.078, 0.078, \
+                                        0.18, 0.18, 0.18, 0.18, 0.0032, 0.0032, 0.0032, 0.0032, \
+                                        0.0032, 0.0032, \
+                                        0.18, 0.18, 0.18, 0.18, 0.0032, 0.0032, 0.0032, 0.0032]
             
         self.gym.set_actor_dof_properties(env_ptr, humanoid_handle, dof_prop)
         
         
-        if self.humanoid_type in ['h1', 'g1', "smpl", "smplh", "smplx"] and self._has_self_collision:
+        if self.humanoid_type in ['h1', 'g1', 'tocabi', "smpl", "smplh", "smplx"] and self._has_self_collision:
             # compliance_vals = [0.1] * 24
             # thickness_vals = [1.0] * 24
             if self._has_mesh:
@@ -1192,8 +1256,8 @@ class Humanoid(BaseTask):
                     filter_ints = [0, 2, 0, 2, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
                 elif self.humanoid_type in ['g1']:
                     filter_ints = [0, 0, 2688, 0, 8192, 0, 8192, 0, 1344, 0, 4096, 0, 4096, 3072, 768, 192, 1, 0, 1, 0, 32, 8, 40, 0, 0, 0, 0, 0, 2, 0, 2, 0, 16, 4, 20, 0, 0, 0, 0, 0]
-
-                    
+                elif self.humanoid_type in ['tocabi']:
+                    filter_ints = [0] * 61
             props = self.gym.get_actor_rigid_shape_properties(env_ptr, humanoid_handle)
             assert (len(filter_ints) == len(props))
 
@@ -1299,7 +1363,14 @@ class Humanoid(BaseTask):
                 color_vec = gymapi.Vec3(*geom_colors[j])
                 self.gym.set_rigid_body_color(env_ptr, humanoid_handle, j, gymapi.MESH_VISUAL, color_vec)
 
-        
+        elif self.humanoid_type in ['tocabi']:
+            RED_BODY_IDS = [3,4,6,8, 11,12,14,16, 17,18, 19,22,24, 28, 29,32,34]
+            for j in range(self.num_bodies):
+                if j in RED_BODY_IDS:
+                    self.gym.set_rigid_body_color(env_ptr, humanoid_handle, j, gymapi.MESH_VISUAL, gymapi.Vec3(0.85938, 0.07813, 0.23438))
+                else:
+                    self.gym.set_rigid_body_color(env_ptr, humanoid_handle, j, gymapi.MESH_VISUAL, gymapi.Vec3(0.20313, 0.20313, 0.20313))
+                    
         self.humanoid_handles.append(humanoid_handle)
 
         return
@@ -1440,7 +1511,7 @@ class Humanoid(BaseTask):
                 
                 
                 
-                if self.humanoid_type in ["'h1', 'g1', smpl", "smplh", "smplx"] :
+                if self.humanoid_type in ['h1', 'g1', 'tocabi', "smpl", "smplh", "smplx"] :
                     if (env_ids is None):
                         body_shape_params = self.humanoid_shapes[:, :-6] if self.humanoid_type in ["smpl", "smplh", "smplx"] else self.humanoid_shapes
                         limb_weights = self.humanoid_limb_and_weights
@@ -1483,6 +1554,8 @@ class Humanoid(BaseTask):
                     else:
                         body_shape_params = self.humanoid_shapes[env_ids]
                     obs = compute_humanoid_observations_smpl(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, self._dof_obs_size, self._dof_offsets, body_shape_params, self._local_root_obs, self._root_height_obs, self._has_upright_start, self._has_shape_obs)
+                elif self.humanoid_type in ['tocabi']:
+                    obs = compute_humanoid_observations_tocabi(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, self._local_root_obs, self._root_height_obs, self._dof_obs_size, self._dof_offsets)
                 else:
                     obs = compute_humanoid_observations(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, self._local_root_obs, self._root_height_obs, self._dof_obs_size, self._dof_offsets)
             
@@ -1649,7 +1722,7 @@ class Humanoid(BaseTask):
         return
 
     def _build_key_body_ids_tensor(self, key_body_names):
-        if self.humanoid_type in ['h1', 'g1',  'smpl', 'smplh', 'smplx']:
+        if self.humanoid_type in ['h1', 'g1', 'tocabi', 'smpl', 'smplh', 'smplx']:
             body_ids = [self._body_names.index(name) for name in key_body_names]
             body_ids = to_torch(body_ids, device=self.device, dtype=torch.long)
 
@@ -1811,6 +1884,42 @@ def compute_humanoid_observations(root_pos, root_rot, root_vel, root_ang_vel, do
     obs = torch.cat((root_h_obs, root_rot_obs, local_root_vel, local_root_ang_vel, dof_obs, dof_vel, flat_local_key_pos), dim=-1)
     return obs
 
+@torch.jit.script
+def compute_humanoid_observations_tocabi(root_pos, root_rot, root_vel, root_ang_vel, dof_pos, dof_vel, key_body_pos, local_root_obs, root_height_obs, dof_obs_size, dof_offsets):
+    # type: (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, Tensor, bool, bool, int, List[int]) -> Tensor
+    root_h = root_pos[:, 2:3]
+    heading_rot = torch_utils.calc_heading_quat_inv(root_rot)
+
+    if (local_root_obs):
+        root_rot_obs = quat_mul(heading_rot, root_rot)
+    else:
+        root_rot_obs = root_rot
+    # root_rot_obs = torch_utils.quat_to_tan_norm(root_rot_obs)
+    root_alpha, root_beta, root_gamma = torch_utils.quat2euler(root_rot_obs)
+    root_rot_obs_euler = torch.cat((root_alpha.unsqueeze(-1), root_beta.unsqueeze(-1), root_gamma.unsqueeze(-1)), dim=-1)
+
+    if (not root_height_obs):
+        root_h_obs = torch.zeros_like(root_h)
+    else:
+        root_h_obs = root_h
+
+    local_root_vel = torch_utils.my_quat_rotate(heading_rot, root_vel)
+    local_root_ang_vel = torch_utils.my_quat_rotate(heading_rot, root_ang_vel)
+
+    root_pos_expand = root_pos.unsqueeze(-2)
+    local_key_body_pos = key_body_pos - root_pos_expand
+
+    heading_rot_expand = heading_rot.unsqueeze(-2)
+    heading_rot_expand = heading_rot_expand.repeat((1, local_key_body_pos.shape[1], 1))
+    flat_end_pos = local_key_body_pos.view(local_key_body_pos.shape[0] * local_key_body_pos.shape[1], local_key_body_pos.shape[2])
+    flat_heading_rot = heading_rot_expand.view(heading_rot_expand.shape[0] * heading_rot_expand.shape[1], heading_rot_expand.shape[2])
+    local_end_pos = torch_utils.my_quat_rotate(flat_heading_rot, flat_end_pos)
+    flat_local_key_pos = local_end_pos.view(local_key_body_pos.shape[0], local_key_body_pos.shape[1] * local_key_body_pos.shape[2])
+
+    # dof_obs = dof_to_obs(dof_pos, dof_obs_size, dof_offsets)
+
+    obs = torch.cat((root_h_obs, root_rot_obs_euler, local_root_vel, local_root_ang_vel, dof_pos, dof_vel, flat_local_key_pos), dim=-1)
+    return obs
 
 @torch.jit.script
 def compute_humanoid_observations_max(body_pos, body_rot, body_vel, body_ang_vel, local_root_obs, root_height_obs):

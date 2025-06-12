@@ -1,0 +1,80 @@
+task: HumanoidIm
+motion_file: "data/tocabi/v1/tocabi_dataset.pkl"
+num_envs: 16
+env_spacing: 5
+episode_length: 8000
+is_flag_run: False
+enable_debug_vis: False
+
+sym_loss_coef: 1
+big_ankle: True
+fut_tracks: False
+obs_v: 6
+self_obs_v: 1
+
+auto_pmcp: False
+auto_pmcp_soft: True
+  
+cycle_motion: False
+hard_negative: False
+
+masterfoot: False
+freeze_toe: false
+
+######## PNN Feats ########
+has_pnn: True
+num_prim: 3
+training_prim: 0
+has_lateral: False
+actors_to_load: 0
+fitting: False
+######## Getup Features. ########
+getup_schedule: False
+recoverySteps: 90
+recoveryEpisodeProb: 0.5
+fallInitProb: 0.3
+getup_udpate_epoch: 270171
+zero_out_far: False
+zero_out_far_train: False
+#######
+
+# default_humanoid_mass: 51.436 # Only Used for PD control
+real_weight: True
+kp_scale: 1
+remove_toe_im: False # For imitation 
+power_reward: True
+power_coefficient: 0.0005
+
+
+powerScale: 1.0
+
+stateInit: "Random"  
+hybridInitProb: 0.5
+numAMPObsSteps: 5
+
+local_root_obs: True
+root_height_obs: True
+key_bodies: ["L_AnkleRoll_Link", "R_AnkleRoll_Link", "L_Wrist2_Link",  "R_Wrist2_Link"]
+contact_bodies: ["L_Foot_Link", "R_Foot_Link"]
+reset_bodies: [ 'base_link',
+  'L_HipRoll_Link', 'L_HipCenter_Link', 'L_Thigh_Link', 'L_Knee_Link', 'L_AnkleCenter_Link', 'L_AnkleRoll_Link', 'L_Foot_Link',
+  'R_HipRoll_Link', 'R_HipCenter_Link', 'R_Thigh_Link', 'R_Knee_Link', 'R_AnkleCenter_Link', 'R_AnkleRoll_Link', 'R_Foot_Link',
+  'Waist1_Link', 'Waist2_Link', 'Upperbody_Link',
+  'L_Shoulder1_Link', 'L_Shoulder2_Link', 'L_Shoulder3_Link', 'L_Armlink_Link', 'L_Elbow_Link', 'L_Forearm_Link', 'L_Wrist1_Link', 'L_Wrist2_Link',
+  'Neck_Link', 'Head_Link',
+  'R_Shoulder1_Link', 'R_Shoulder2_Link', 'R_Shoulder3_Link', 'R_Armlink_Link', 'R_Elbow_Link', 'R_Forearm_Link', 'R_Wrist1_Link', 'R_Wrist2_Link'
+]
+terminationHeight: 0.15
+enableEarlyTermination: True
+terminationDistance: 0.25
+
+### Fut config
+numTrajSamples: 3
+trajSampleTimestepInv: 30
+enableTaskObs: True
+
+
+plane:
+  staticFriction: 1.0
+  dynamicFriction: 1.0
+  restitution: 0.0

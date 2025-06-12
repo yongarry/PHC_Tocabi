@@ -10,6 +10,8 @@ Official implementation of ICCV 2023 paper: "Perpetual Humanoid Control for Real
 </div>
 
 # Table of Contents
+* [News 🚩](#news-)
+* [TODOs](#todos)
 * [Introduction](#introduction)
     * [Docs](#docs)
     * [Current Results on Cleaned AMASS (11313 Sequences)](#current-results-on-cleaned-amass-11313-sequences)
@@ -17,6 +19,9 @@ Official implementation of ICCV 2023 paper: "Perpetual Humanoid Control for Real
 * [Evaluation](#evaluation)
     * [Minimal Viable Evaluation](#minimal-viable-evaluation)
     * [Viewer Shortcuts](#viewer-shortcuts)
+    * [Imitation](#imitation)
+    * [In-the-wild Avatar Control](#in-the-wild-avatar-control)
+    * [VR Controller Tracking](#vr-controller-tracking)
 * [Training](#training)
     * [Data Processing AMASS](#data-processing-amass)
     * [Training PHC](#training-phc)
@@ -25,6 +30,59 @@ Official implementation of ICCV 2023 paper: "Perpetual Humanoid Control for Real
     * [Success Rate](#success-rate)
 * [Citation](#citation)
 * [References](#references)
+
+## News 🚩
+
+[December 10, 2024] Release process for generating offline dataset (PHC_Act) for offline RL or behavior cloning (developed by [@kangnil](https://github.com/kangnil)). See [docs/offline_dataset.md](docs/offline_dataset.md) for more details. 
+
+[December 9, 2024] Release retargeting [documentation](docs/retargeting.md) (for retargeting to your own humanoids using SMPL data). 
+
+[October 8, 2024] Release support for Unitree H1 and G1 humanoid. 
+
+[August 30, 2024] Release support for SMPLX humanoid. 
+
+[Apirl 5, 2024] Upgrading to use [SMPLSim](https://github.com/ZhengyiLuo/SMPLSim) to automatically create the SMPL humanoid. Please run `pip install git+https://github.com/ZhengyiLuo/SMPLSim.git@master` to SMPLSim. SMPLSim requires python 3.8; for python 3.7, please `pip install git+https://github.com/ZhengyiLuo/SMPLSim.git@isaac37`.
+
+[Feburary 28, 2024] Releasing Auto-PMCP procedure to train single primitives; this procedure can lead to very high-performant imiatators without PNN, though it wouldn't have the failure state recovery capability. See the `auto_pmcp_soft` flag. 
+
+[Feburary 19, 2024] Releasing PHC+ model (100% success rate on AMASS) used in [PULSE](https://zhengyiluo.github.io/PULSE/).
+
+[Feburary 17, 2024] Fixed a bug when overhauling the system to Hydra. Please pull the newest version :). 
+
+[Feburary 1, 2024] Overhauling the config system to Hydra. 
+
+[January 8, 2024] Support for running inference without SMPL model. 
+
+[January 7, 2024] Release language-to-control demo (based on MDM). 
+
+[December 19, 2023] Release VR controller tracking code. 
+
+[December 14, 2023] Release webcam video-based control demo. 
+
+[October 31, 2023] Remove dependency on mujoco 210 and update to the newest mujoco version (for creating xml robot; no more downloads and direct install with `pip install mujoco`!). Updated amass_occlusion_v3 to 11313 sequences for training (was 11315). Updated requirement.txt. 
+
+[October 25, 2023] Training and Evaluation code released.
+
+
+## TODOs
+
+- [x] Add support for Unitree H1 & G1.
+
+- [x] Add support for smplx/h (fingers!!!).
+
+- [x] Release PHC+ model (100% success rate on AMASS) used in [PULSE](https://zhengyiluo.github.io/PULSE/). 
+
+- [x] Release language-based demo code.  
+
+- [x] Release vr controller tracking code.  
+
+- [x] Release video-based demo code.  
+
+- [x] Additional instruction on Isaac Gym SMPL robot. 
+
+- [x] Release training code. 
+
+- [x] Release evaluation code. 
 
 ## Introduction
 We present a physics-based humanoid controller that achieves high-fidelity motion imitation and fault-tolerant behavior in the presence of noisy input (e.g. pose estimates from video or generated from language) and unexpected falls. Our controller scales up to learning ten thousand motion clips without using any external stabilizing forces and learns to naturally recover from fail-state. Given reference motion, our controller can perpetually control simulated avatars without requiring resets. At its core, we propose the progressive multiplicative control policy (PMCP), which dynamically allocates new network capacity to learn harder and harder motion sequences. PMCP allows efficient scaling for learning from large-scale motion databases and adding new tasks, such as fail-state recovery, without catastrophic forgetting. We demonstrate the effectiveness of our controller by using it to imitate noisy poses from video-based pose estimators and language-based motion generators in a live and real-time multi-person avatar use case.
@@ -132,6 +190,98 @@ You can use the `render_o3d=True no_virtual_display=True` flag to render the SMP
 
 to do the above visulaization, press m (to cancel termination based on imitation), and then press j (to apply a large force to the humanoid). 
 
+### Imitation 
+
+#### SMPL and SMPL-X
+
+PHC-X-Prim (single primitive model)
+```
+python phc/run_hydra.py learning=im_pnn_big exp_name=phc_x_pnn  env=env_im_x_pnn robot=smplx_humanoid env.motion_file=sample_data/standing_x.pkl env.training_prim=0 epoch=-1 test=True  env.num_envs=1  headless=False
+```
+
+PHC+: keypoint model, can getup from the ground and walk back) | Best model for video/language model
+```
+python phc/run_hydra.py learning=im_mcp_big learning.params.network.ending_act=False exp_name=phc_comp_kp_2 env.obs_v=7 env=env_im_getup_mcp robot=smpl_humanoid robot.real_weight_porpotion_boxes=False env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_kp_2/Humanoid.pth'] env.num_prim=3 env.num_envs=1  headless=False epoch=-1 test=True
+```
+
+PHC+: rotation + keypoint model, can getup from the ground but not walk back -- model used in PULSE due to time constraint
+```
+python phc/run_hydra.py learning=im_mcp_big  exp_name=phc_comp_3 env=env_im_getup_mcp robot=smpl_humanoid env.zero_out_far=False robot.real_weight_porpotion_boxes=False env.num_prim=3 env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_3/Humanoid.pth'] env.num_envs=1  headless=False epoch=-1 test=True
+```
+
+Evaluate full model:
+
+```
+## Shape + rotation + keypoint model
+
+python phc/run_hydra.py learning=im_mcp exp_name=phc_shape_mcp_iccv test=True env=env_im_getup_mcp robot=smpl_humanoid_shape robot.freeze_hand=True robot.box_body=False env.z_activation=relu env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_shape_pnn_iccv/Humanoid.pth'] env.num_envs=1  headless=False epoch=-1
+
+
+
+## keypoint model
+python phc/run_hydra.py learning=im_mcp exp_name=phc_kp_mcp_iccv  test=True env=env_im_getup_mcp robot=smpl_humanoid robot.freeze_hand=True robot.box_body=False env.z_activation=relu env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_kp_pnn_iccv/Humanoid.pth'] env.num_envs=1 env.obs_v=7 headless=False epoch=-1
+
+```
+
+Evaluate on AMASS:
+
+```
+## rotation + keypoint model (100% - PHC+)
+python phc/run_hydra.py learning=im_mcp_big  exp_name=phc_comp_3 env=env_im_getup_mcp robot=smpl_humanoid env.zero_out_far=False robot.real_weight_porpotion_boxes=False env.num_prim=3 env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_3/Humanoid.pth'] env.num_envs=1  headless=False im_eval=True
+
+
+## Shape + rotation + keypoint model
+python phc/run_hydra.py learning=im_mcp exp_name=phc_shape_mcp_iccv epoch=-1 test=True env=env_im_getup_mcp robot=smpl_humanoid_shape robot.freeze_hand=True robot.box_body=False env.z_activation=relu env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_shape_pnn_iccv/Humanoid.pth'] env.num_envs=1  headless=False im_eval=True
+
+
+## keypoint model
+python phc/run_hydra.py learning=im_mcp exp_name=phc_kp_mcp_iccv epoch=-1 test=True env=env_im_getup_mcp robot=smpl_humanoid robot.freeze_hand=True robot.box_body=False env.z_activation=relu env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_kp_pnn_iccv/Humanoid.pth'] env.num_envs=1024 env.obs_v=7  im_eval=True
+```
+
+Evaluate single primitive model:
+
+```
+## Shape + rotation + keypoint model
+python phc/run_hydra.py learning=im_pnn exp_name=phc_shape_pnn_iccv epoch=-1 test=True env=env_im_pnn robot=smpl_humanoid_shape robot.freeze_hand=True robot.box_body=False env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl  env.num_envs=1  headless=False
+
+
+## keypoint model
+python phc/run_hydra.py learning=im_pnn exp_name=phc_kp_pnn_iccv epoch=-1 test=True env=env_im_pnn env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl robot.freeze_hand=True robot.box_body=False env.num_envs=1 env.obs_v=7  headless=False
+```
+
+### In-the-wild Avatar Control
+
+See [Webcam Demo](docs/video_to_control_demo.md)
+
+The tldr is run:
+
+```
+python scripts/demo/video_to_pose_server.py
+```
+
+then
+
+```
+python phc/run_hydra.py learning=im_mcp exp_name=phc_kp_mcp_iccv env=env_im_getup_mcp env.task=HumanoidImMCPDemo robot=smpl_humanoid robot.freeze_hand=True robot.box_body=False env.z_activation=relu env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_kp_pnn_iccv/Humanoid.pth'] env.num_envs=1 env.obs_v=7 headless=False epoch=-1 test=True no_virtual_display=True
+
+```
+
+
+See [Language-to-motion Demo](docs/language_to_control_demo.md)
+
+```
+python phc/run_hydra.py learning=im_mcp exp_name=phc_kp_mcp_iccv env=env_im_getup_mcp env.task=HumanoidImMCPDemo robot=smpl_humanoid robot.freeze_hand=True robot.box_body=False env.z_activation=relu env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.models=['output/HumanoidIm/phc_kp_pnn_iccv/Humanoid.pth'] env.num_envs=1 env.obs_v=7 headless=False epoch=-1 test=True no_virtual_display=True
+
+```
+
+### VR Controller Tracking
+
+```
+python phc/run_hydra.py learning=im_big exp_name=phc_prim_vr env=env_vr robot=smpl_humanoid robot.box_body=False env.motion_file=sample_data/amass_isaac_standing_upright_slim.pkl env.num_envs=1 headless=False epoch=-1 test=True no_virtual_display=True
+```
+
+
+
 ## Training
 
 
@@ -157,19 +307,6 @@ python phc/run_hydra.py  project_name=Robot_IM   robot=unitree_h1      env=env_i
 ```
 
 After training, you can run eval by adding `num_threads=1 headless=False test=True epoch=-1` to the above scripts. 
-
-
-### Arguments Lists
-
-- project_name: Project Name for wandb
-- robot: robot name, it will load ${robot}.yaml on phc/data/cfg/robot/
-- env: loaded from phc/data/cfg/env
-- env.motion_file: reference amass data
-- learning: loaded from phc/data/cfg/learning
-- exp_name: wandb run name setting
-- sim: loaded from phc/data/cfg/sim
-- control: loaded from phc/data/cfg/control
-
 
 #### Train single primitive
 
