@@ -16,7 +16,7 @@ defaults:
 project_name: "TocabiPHC"
 notes: "Default Notes"
 exp_name: &exp_name tocabi_phc
-headless: False
+headless: True
 seed: 0
 no_log: False
 resume_str: null

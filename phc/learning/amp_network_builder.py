@@ -25,6 +25,11 @@ class AMPBuilder(network_builder.A2CBuilder):
                     sigma_init = self.init_factory.create(**self.space_config['sigma_init'])
                     self.sigma = nn.Parameter(torch.zeros(actions_num, requires_grad=False, dtype=torch.float32), requires_grad=False)
                     sigma_init(self.sigma)
+                else:
+                    sigma_init = self.init_factory.create(**self.space_config['sigma_init'])
+                    actions_num = kwargs.get('actions_num')
+                    self.sigma = nn.Parameter(torch.zeros(actions_num, requires_grad=True, dtype=torch.float32), requires_grad=True)
+                    sigma_init(self.sigma)
 
             amp_input_shape = kwargs.get('amp_input_shape')
             self._build_disc(amp_input_shape)

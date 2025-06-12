@@ -81,7 +81,7 @@ class AMPPNNBuilder(AMPBuilder):
                 if self.space_config['fixed_sigma']:
                     sigma = mu * 0.0 + self.sigma_act(self.sigma)
                 else:
-                    sigma = self.sigma_act(self.sigma(a_out))
+                    sigma = self.sigma_act(self.sigma)
 
                 return mu, sigma
             return
