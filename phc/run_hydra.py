@@ -138,10 +138,10 @@ def create_rlgpu_env(**kwargs):
     }) #### ZL: patch 
     task, env = parse_task(args, cfg, cfg_train, sim_params)
 
-    print(env.num_envs)
-    print(env.num_actions)
-    print(env.num_obs)
-    print(env.num_states)
+    print("parallel environments:  ", env.num_envs)
+    print("number of actions:      ", env.num_actions)
+    print("number of observations: ", env.num_obs)
+    print("number of states:       ", env.num_states)
 
     frames = kwargs.pop('frames', 1)
     if frames > 1:
@@ -269,7 +269,7 @@ def build_alg_runner(algo_observer):
 def main(cfg_hydra: DictConfig) -> None:
     global cfg_train
     global cfg
-    
+    OmegaConf.register_new_resolver("multiply", lambda x, y: x * y)
     cfg = EasyDict(OmegaConf.to_container(cfg_hydra, resolve=True))
     
     set_np_formatting()

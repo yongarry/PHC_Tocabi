@@ -1,6 +1,6 @@
 task: HumanoidIm
 motion_file: "data/tocabi/v1/tocabi_dataset.pkl"
-num_envs: 4096
+num_envs: 32
 env_spacing: 5
 episode_length: 8000
 is_flag_run: False
