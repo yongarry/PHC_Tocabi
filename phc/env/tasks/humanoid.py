@@ -54,7 +54,7 @@ import torch.multiprocessing as mp
 from phc.utils.draw_utils import agt_color, get_color_gradient
 
 
-ENABLE_MAX_COORD_OBS = False #for tocabi
+ENABLE_MAX_COORD_OBS = True #for tocabi
 # PERTURB_OBJS = [
 #     ["small", 60],
 #     ["small", 7],
@@ -214,6 +214,14 @@ class Humanoid(BaseTask):
         self._dof_vel = self._dof_state.view(self.num_envs, dofs_per_env, 2)[..., :self.num_dof, 1]
 
         self._initial_dof_pos = torch.zeros_like(self._dof_pos, device=self.device, dtype=torch.float)
+        if self.humanoid_type == "tocabi":
+            self._initial_dof_pos = torch.tensor([0.0, 0.0, -0.24, 0.6, -0.36, 0.0,
+                                                     0.0, 0.0, -0.24, 0.6, -0.36, 0.0,
+                                                     0.0, 0.0, 0.0, 
+                                                     0.3, 0.3, 1.5, -1.27, -1.0, 0.0, -1.0, 0.0,
+                                                     0.0, 0.0, 
+                                                     -0.3, -0.3, -1.5, 1.27, 1.0, 0.0, 1.0, 0.0], device=self.device).expand(self.num_envs, -1)
+        
         self._initial_dof_vel = torch.zeros_like(self._dof_vel, device=self.device, dtype=torch.float)
 
         self._rigid_body_state = gymtorch.wrap_tensor(rigid_body_state)

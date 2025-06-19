@@ -121,23 +121,25 @@ def process_motion(key_names, key_name_to_pkls, cfg):
 
         
         for iteration in range(cfg.get("fitting_iterations", 500)):
-            # build full pose including root, actuated, augment and pad non-actuated joints
-            total_joints = humanoid_fk._parents.shape[0]
-            # zeros for augment joints
-            zeros_aug = torch.zeros((1, N, num_augment_joint, 3), device=device)
-            # zeros for remaining non-actuated joints
-            pad_count = total_joints - 1 - humanoid_fk.num_extend_dof
-            zeros_pad = torch.zeros((1, N, pad_count, 3), device=device) if pad_count>0 else torch.empty(1, N, 0, 3, device=device)
-            zeros_pad[..., 2] = 1.0  # ensure z is zero for non-actuated joints
-            pose_aa_h1_new = torch.cat([
-                root_rot_new[None, :, None],
-                humanoid_fk.dof_axis[:6,:] * dof_pos_new[:, :, :6, :],  
-                zeros_pad[..., :2, :],  
-                humanoid_fk.dof_axis[6:12, :] * dof_pos_new[:, :, 6:12, :],
-                zeros_pad[..., 2:, :],  
-                humanoid_fk.dof_axis[12:, :] * dof_pos_new[:, :, 12:, :], 
-                zeros_aug
-            ], dim=2)
+            pose_aa_h1_new = torch.cat([root_rot_new[None, :, None], humanoid_fk.dof_axis * dof_pos_new, torch.zeros((1, N, num_augment_joint, 3)).to(device)], axis = 2)
+            if cfg.robot.humanoid_type == "g1":
+                # build full pose including root, actuated, augment and pad non-actuated joints
+                total_joints = humanoid_fk._parents.shape[0]
+                # zeros for augment joints
+                zeros_aug = torch.zeros((1, N, num_augment_joint, 3), device=device)
+                # zeros for remaining non-actuated joints
+                pad_count = total_joints - 1 - humanoid_fk.num_extend_dof
+                zeros_pad = torch.zeros((1, N, pad_count, 3), device=device) if pad_count>0 else torch.empty(1, N, 0, 3, device=device)
+                zeros_pad[..., 2] = 1.0  # ensure z is zero for non-actuated joints
+                pose_aa_h1_new = torch.cat([
+                    root_rot_new[None, :, None],
+                    humanoid_fk.dof_axis[:19,:] * dof_pos_new[:, :, :19, :],  
+                    zeros_pad[..., :3, :],  
+                    humanoid_fk.dof_axis[19:, :] * dof_pos_new[:, :, 19:, :],
+                    zeros_pad[..., 3:, :],  
+                    zeros_aug
+                ], dim=2)
+
             fk_return = humanoid_fk.fk_batch(pose_aa_h1_new, root_trans_offset[None, ] + root_pos_offset )
             
             
@@ -185,22 +187,22 @@ def process_motion(key_names, key_name_to_pkls, cfg):
         
             
         dof_pos_new.data.clamp_(humanoid_fk.joints_range[:, 0, None], humanoid_fk.joints_range[:, 1, None])
-        # pose_aa_h1_new = torch.cat([root_rot_new[None, :, None], humanoid_fk.dof_axis * dof_pos_new, torch.zeros((1, N, num_augment_joint, 3)).to(device)], axis = 2)
-        # rebuild full pose for final output as above
-        total_joints = humanoid_fk._parents.shape[0]
-        zeros_aug = torch.zeros((1, N, num_augment_joint, 3), device=device)
-        pad_count = total_joints - 1 - humanoid_fk.num_extend_dof
-        zeros_pad = torch.zeros((1, N, pad_count, 3), device=device) if pad_count>0 else torch.empty(1, N, 0, 3, device=device)
-        zeros_pad[..., 2] = 1.0  # ensure z is zero for non-actuated joints
-        pose_aa_h1_new = torch.cat([
-            root_rot_new[None, :, None],
-            humanoid_fk.dof_axis[:6,:] * dof_pos_new[:, :, :6, :],  
-            zeros_pad[..., :2, :],  
-            humanoid_fk.dof_axis[6:12, :] * dof_pos_new[:, :, 6:12, :],
-            zeros_pad[..., 2:, :],  
-            humanoid_fk.dof_axis[12:, :] * dof_pos_new[:, :, 12:, :], 
-            torch.zeros((1, N, num_augment_joint, 3)).to(device)
-        ], dim=2)
+        pose_aa_h1_new = torch.cat([root_rot_new[None, :, None], humanoid_fk.dof_axis * dof_pos_new, torch.zeros((1, N, num_augment_joint, 3)).to(device)], axis = 2)
+        if cfg.robot.humanoid_type == "g1":
+            # rebuild full pose for final output as above
+            total_joints = humanoid_fk._parents.shape[0]
+            zeros_aug = torch.zeros((1, N, num_augment_joint, 3), device=device)
+            pad_count = total_joints - 1 - humanoid_fk.num_extend_dof
+            zeros_pad = torch.zeros((1, N, pad_count, 3), device=device) if pad_count>0 else torch.empty(1, N, 0, 3, device=device)
+            zeros_pad[..., 2] = 1.0  # ensure z is zero for non-actuated joints
+            pose_aa_h1_new = torch.cat([
+                root_rot_new[None, :, None],
+                humanoid_fk.dof_axis[:19,:] * dof_pos_new[:, :, :19, :],  
+                zeros_pad[..., :3, :],  
+                humanoid_fk.dof_axis[19:, :] * dof_pos_new[:, :, 19:, :],
+                zeros_pad[..., 3:, :],
+                zeros_aug
+            ], dim=2)
 
         root_trans_offset_dump = (root_trans_offset + root_pos_offset ).clone()
 

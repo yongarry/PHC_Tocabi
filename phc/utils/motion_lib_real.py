@@ -418,8 +418,16 @@ class MotionLibReal(MotionLibBase):
             
             
             curr_motion = EasyDict({k: v.squeeze() if torch.is_tensor(v) else v for k, v in curr_motion.items() })
+            curr_motion.dof_pos = dof_pos
             
-            
+            dof_vel = (dof_pos[1:, :] - dof_pos[:-1, :])/dt
+            dof_vels = torch.cat([dof_vel, dof_vel[-1:, :]], dim = 0)
+            curr_motion.dof_vels = dof_vels
+            # print("===========================dof_vels===========================")
+            # print(dt)
+            # print(dof_vels[0, :])
+            # print(curr_motion.dof_vels[0, :])
+            # print("===========================dof_vels===========================")
             res[curr_id] = (curr_file, curr_motion)
             
         if not queue is None:

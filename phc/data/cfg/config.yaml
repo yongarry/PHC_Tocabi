@@ -6,12 +6,29 @@ defaults:
   # - sim: default_sim
   # - control: default_control
   # - domain_rand: default_dr
-  - env: env_im_tocabi_phc
-  - robot: tocabi
+
+  ########## Tocabi PHC ##########
+  # - env: env_im_tocabi_phc
+  # - robot: tocabi
+  # - learning: im_pnn_big
+  # - sim: tocabi_sim
+  # - control: tocabi_control
+  # - domain_rand: default_dr
+  ########## G1 PHC ##########
+  - env: env_im_g1_phc
+  - robot: unitree_g1_23dof
   - learning: im_pnn_big
-  - sim: tocabi_sim
-  - control: tocabi_control
+  - sim: robot_sim
+  - control: robot_control
   - domain_rand: default_dr
+  ########## G1 AMP ##########
+  # - env: env_amp_g1_29dof
+  # # - env: env_amp_g1
+  # - robot: unitree_g1_29dof
+  # - learning: amp
+  # - sim: robot_sim
+  # - control: robot_control
+  # - domain_rand: default_dr
 
 project_name: "TocabiPHC"
 notes: "Default Notes"

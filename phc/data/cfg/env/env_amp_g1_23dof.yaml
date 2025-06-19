@@ -1,6 +1,6 @@
 task: HumanoidAMP
-motion_file: ""
-num_envs: 3072
+motion_file: "data/g1/v1/singles/0-ACCAD_Male1Walking_c3d_Walk_B15_-_Walk_turn_around_stageii.pkl"
+num_envs: 64
 env_spacing: 5
 episode_length: 300
 is_flag_run: False

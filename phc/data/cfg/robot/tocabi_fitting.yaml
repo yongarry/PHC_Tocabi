@@ -48,24 +48,24 @@ dof_names: [
   'R_Shoulder1_Joint', 'R_Shoulder2_Joint', 'R_Shoulder3_Joint', 'R_Armlink_Joint', 'R_Elbow_Joint', 'R_Forearm_Joint', 'R_Wrist1_Joint', 'R_Wrist2_Joint'
 ]
 
-right_foot_name: 'R_Foot_Link'
-left_foot_name: 'L_Foot_Link'
+right_foot_name: 'R_AnkleRoll_Link'
+left_foot_name: 'L_AnkleRoll_Link'
 
 asset:
   assetRoot: "./"
-  assetFileName: "phc/data/assets/robot/tocabi/dyros_tocabi_fitting.xml"
-  urdfFileName: "phc/data/assets/robot/tocabi/dyros_tocabi_fitting.xml"
+  assetFileName: "phc/data/assets/robot/tocabi/dyros_tocabi_v2.xml"
+  urdfFileName: "phc/data/assets/robot/tocabi/dyros_tocabi_v2.xml"
 
-extend_config: 
-  - joint_name: "L_Foot_Link"
-    parent_name: "L_AnkleRoll_Link"
-    pos: [0.20, 0, -0.1]
-    rot: [1.0, 0.0, 0.0, 0.0]
+extend_config: []
+  # - joint_name: "L_Foot_Link"
+  #   parent_name: "L_AnkleRoll_Link"
+  #   pos: [0.20, 0, -0.1]
+  #   rot: [1.0, 0.0, 0.0, 0.0]
 
-  - joint_name: "R_Foot_Link"
-    parent_name: "R_AnkleRoll_Link"
-    pos: [0.20, 0, -0.1]
-    rot: [1.0, 0.0, 0.0, 0.0]
+  # - joint_name: "R_Foot_Link"
+  #   parent_name: "R_AnkleRoll_Link"
+  #   pos: [0.20, 0, -0.1]
+  #   rot: [1.0, 0.0, 0.0, 0.0]
 
 base_link: "base_link"
 joint_matches:
@@ -83,8 +83,8 @@ joint_matches:
   - ["R_Elbow_Link", "R_Elbow"]
   - ["R_Wrist2_Link", "R_Hand"]
   - ["Head_Link", "Head"]
-  - ["L_Foot_Link", "L_Toe"]
-  - ["R_Foot_Link", "R_Toe"]
+  # - ["L_Foot_Link", "L_Toe"]
+  # - ["R_Foot_Link", "R_Toe"]
 
 smpl_pose_modifier:
   - Pelvis: "[np.pi/2, 0, np.pi/2]"
